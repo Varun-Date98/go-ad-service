@@ -1,45 +1,52 @@
 package main
 
 import (
-	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
+
+	"github.com/Varun-Date98/go-ad-service/internal/database"
 )
 
 
-func adHandler(w http.ResponseWriter, r *http.Request) {
+func (db *dbAPI) adHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
-	ageStr := q.Get("age")
-	age := 0
+	userId := q.Get("user_id")
+	user, err := db.DB.GetUserById(r.Context(), userId)
+
+	if err != nil {
+		respondWithError(w, 400, fmt.Sprintf("Error getting user with id %v, %v", userId, err))
+	}
+
+	placementId := q.Get("placement_id")
+	creatorId := q.Get("creator_id")
+
+	userCtx := UserContext{
+		UserID: user.UserID,
+		Age: int(user.Age),
+		Country: user.Country,
+		Device: user.Device,
+		Language: user.Language,
+		Interests: user.Interests,
+	}
+
+	placementCtx := PlacementContext{
+		PlacementID: placementId,
+		CreatorID: creatorId,
+	}
+
+	adCandidatesCtx, err := db.DB.GetCandidateAd(r.Context(), database.GetCandidateAdParams{
+		Country: user.Country,
+		Age: user.Age,
+		PlacementID: placementId,
+		Device: user.Device,
+		Language: user.Language,
+		CreatorID: creatorId,
+		Interests: user.Interests,
+	})
 	
-	if ageStr != "" {
-		parsed, err := strconv.Atoi(ageStr)
-		
-		if err == nil {
-			age = parsed
-		} else {
-			log.Printf("Could not get age from query, %v", err)
-		}
-	}
 
-	user := UserContext{
-		UserID:    q.Get("userId"),
-		Age:       age,
-		Country:   q.Get("country"),
-		Device:    q.Get("device"),
-		Language:  q.Get("lang"),
-		Interests: splitCSV(q.Get("interests")),
-	}
-
-	placement := PlacementContext{
-		PlacementID: q.Get("placementId"),
-		CreatorID:   q.Get("creatorId"),
-	}
-
-	decision := selectAd(user, placement)
+	decision := selectAd(userCtx, placementCtx, adCandidatesCtx)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -50,23 +57,17 @@ func adHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(decision); err != nil {
-		log.Printf("failed to encode response: %v", err)
-	}
-}
-
-
-func splitCSV(interests string) []string {
-	out := []string{}
-	parts := strings.Split(interests, ",")
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-
-		if p != ""{
-			out = append(out, p)
-		}
+	type AdResponce struct {
+		CampaignID string `json:"campaign_id"`
+		CreativeID string `json:"creative_id"`
+		AssetUrl string `json:"asset_url"`
+		ClickUrl string `json:"click_url"`
 	}
 
-	return out
+	respondWithJSON(w, 200, AdResponce{
+		CampaignID: decision.CampaignID,
+		CreativeID: decision.CreativeID,
+		AssetUrl: decision.AssetURL,
+		ClickUrl: decision.ClickURL,
+	})
 }
