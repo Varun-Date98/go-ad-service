@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 
@@ -25,13 +26,17 @@ func adHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := UserContext{
-		UserID:  q.Get("userId"),
-		Age:     age,
-		Country: q.Get("country"),
+		UserID:    q.Get("userId"),
+		Age:       age,
+		Country:   q.Get("country"),
+		Device:    q.Get("device"),
+		Language:  q.Get("lang"),
+		Interests: splitCSV(q.Get("interests")),
 	}
 
 	placement := PlacementContext{
 		PlacementID: q.Get("placementId"),
+		CreatorID:   q.Get("creatorId"),
 	}
 
 	decision := selectAd(user, placement)
@@ -48,4 +53,20 @@ func adHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(decision); err != nil {
 		log.Printf("failed to encode response: %v", err)
 	}
+}
+
+
+func splitCSV(interests string) []string {
+	out := []string{}
+	parts := strings.Split(interests, ",")
+
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+
+		if p != ""{
+			out = append(out, p)
+		}
+	}
+
+	return out
 }
