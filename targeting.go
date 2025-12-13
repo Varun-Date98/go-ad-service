@@ -8,8 +8,9 @@ import (
 	"github.com/Varun-Date98/go-ad-service/internal/database"
 )
 
+type CapFn func(campaignId string) bool
 
-func selectAd(user UserContext, placement PlacementContext, candidates []database.GetCandidateAdRow) *AdDecision {
+func selectAd(user UserContext, placement PlacementContext, candidates []database.GetCandidateAdRow, allow CapFn) *AdDecision {
 	var best *AdDecision
 
 	// Basic ad targeting for v0
@@ -35,6 +36,10 @@ func selectAd(user UserContext, placement PlacementContext, candidates []databas
 		}
 
 		if len(c.CreatorsAny) > 0 && !stringInSlice(placement.CreatorID, c.CreatorsAny) {
+			continue
+		}
+
+		if allow != nil && !allow(c.CampaignID) {
 			continue
 		}
 

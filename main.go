@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -10,10 +11,12 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
 
 type dbAPI struct {
 	DB *database.Queries
+	Redis *redis.Client
 }
 
 func main() {
@@ -32,8 +35,22 @@ func main() {
 		log.Fatal("Could not connect to postgres DB,", err)
 	}
 
+	redisUrl := os.Getenv("REDIS_URL")
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisUrl,
+		DB: 0,
+	})
+
+	_, err = rdb.Ping(context.Background()).Result()
+
+	if err != nil {
+		rdb = nil
+		log.Println("Could not connect to redis, ad capping is turned off")
+	}
+
 	db := dbAPI{
 		DB: database.New(conn),
+		Redis: rdb,
 	}
 
 	router := chi.NewRouter()

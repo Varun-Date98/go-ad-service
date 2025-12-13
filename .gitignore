@@ -2,3 +2,5 @@
 .vscode
 
 go-ad-service.exe
+
+/vendor
